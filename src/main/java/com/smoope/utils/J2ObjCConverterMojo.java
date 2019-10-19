@@ -18,6 +18,7 @@ package com.smoope.utils;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -439,20 +440,20 @@ public class J2ObjCConverterMojo extends AbstractMojo {
         if(this.configFile == null || "".equals(this.configFile))
             return;
         Properties property=new Properties();
-            try {
-                property.load(this.getClass().getClassLoader().getResourceAsStream(this.configFile));
+            try(InputStream is=new FileInputStream(this.configFile);) {
+                property.load(is);
+                Set<Entry<Object, Object>> entries=property.entrySet();
+                for(Entry<Object,Object> entry : entries) {
+                   String path= (String)entry.getValue();
+                   File file=new File(path);
+                   if(!file.exists() || !file.isAbsolute() || file.isDirectory())
+                       continue; //skip this entry
+                   classPath.add(file.getAbsolutePath());
+                }
             } catch (IOException | IllegalArgumentException | NullPointerException e) {
                 throw new RuntimeException("Test properties could not be loaded",e);
             }
             
-            Set<Entry<Object, Object>> entries=property.entrySet();
-            for(Entry<Object,Object> entry : entries) {
-               String path= (String)entry.getValue();
-               File file=new File(path);
-               if(!file.exists() || !file.isAbsolute() || file.isDirectory())
-                   continue; //skip this entry
-               classPath.add(file.getAbsolutePath());
-            }
     }
 
     private List<Artifact> resolveDependencies(final Artifact artifact) throws DependencyResolutionException {
