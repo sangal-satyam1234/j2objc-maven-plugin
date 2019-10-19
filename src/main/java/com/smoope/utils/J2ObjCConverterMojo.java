@@ -16,6 +16,22 @@
 
 package com.smoope.utils;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map.Entry;
+import java.util.Properties;
+import java.util.Set;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
+
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
@@ -42,18 +58,6 @@ import org.eclipse.aether.transport.http.HttpTransporterFactory;
 import org.eclipse.aether.transport.wagon.WagonTransporterFactory;
 import org.eclipse.aether.util.artifact.JavaScopes;
 import org.eclipse.aether.util.filter.DependencyFilterUtils;
-
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 
 @Mojo(name = "convert", defaultPhase = LifecyclePhase.PACKAGE)
 public class J2ObjCConverterMojo extends AbstractMojo {
@@ -183,6 +187,9 @@ public class J2ObjCConverterMojo extends AbstractMojo {
 
     @Parameter(defaultValue = "false")
     private Boolean dependenciesOnly;
+
+    @Parameter(defaultValue = "")
+    private String configFile;
 
     public void execute() throws MojoExecutionException, MojoFailureException {
         try {
@@ -423,7 +430,29 @@ public class J2ObjCConverterMojo extends AbstractMojo {
             classPath.add(dep.getFile().getAbsolutePath());
         }
 
+            resolveConfigClassPath(classPath);
+
         return classPath;
+    }
+    
+    private void resolveConfigClassPath(List<String> classPath) {
+        if(this.configFile == null || "".equals(this.configFile))
+            return;
+        Properties property=new Properties();
+            try {
+                property.load(this.getClass().getClassLoader().getResourceAsStream(this.configFile));
+            } catch (IOException | IllegalArgumentException | NullPointerException e) {
+                throw new RuntimeException("Test properties could not be loaded",e);
+            }
+            
+            Set<Entry<Object, Object>> entries=property.entrySet();
+            for(Entry<Object,Object> entry : entries) {
+               String path= (String)entry.getValue();
+               File file=new File(path);
+               if(!file.exists() || !file.isAbsolute() || file.isDirectory())
+                   continue; //skip this entry
+               classPath.add(file.getAbsolutePath());
+            }
     }
 
     private List<Artifact> resolveDependencies(final Artifact artifact) throws DependencyResolutionException {
